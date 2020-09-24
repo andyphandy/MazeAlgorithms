@@ -1,314 +1,152 @@
 from random import randrange, getrandbits
 from collections import defaultdict
-import timeit
+import time
+import pygame
+import constants
+
+WINDOW_WIDTH = constants.WINDOW_WIDTH
+WINDOW_HEIGHT = constants.WINDOW_HEIGHT
+
+TILE_SIZE = constants.TILE_SIZE
+WALL_SIZE = constants.WALL_SIZE
+MIN_SIZE = constants.MIN_SIZE
+MAX_SIZE = constants.MAX_SIZE
+ROW_WALL = constants.ROW_WALL
+COL_WALL = constants.COL_WALL
+
+DEFAULT_WIDTH = constants.DEFAULT_WIDTH
+DEFAULT_HEIGHT = constants.DEFAULT_HEIGHT
+
+BLACK = constants.BLACK
+WHITE = constants.WHITE
+GREY = constants.GREY
+BLUE = constants.BLUE
+RED = constants.RED
+
+CELL_COLORS = [GREY, BLUE, WHITE, RED]
 
 class Maze:
-  ##############################################################################
-  #                               HELPER METHODS                               #
-  ##############################################################################
+  def __init__(self, width, height, screen):
+    self.reset_maze(width, height, screen)
 
-  def create_walls(self):
-    self.walls = []
-    for cell in range(self.total):
-      x = int(cell % self.width)
-      y = int(cell / self.width)
-      cellWalls = []
-      if x != 0:
-        cellWalls.append(cell-1)
-      if x != width-1:
-        cellWalls.append(cell+1)
-      if y != 0:
-        cellWalls.append(cell-width)
-      if y != height-1:
-        cellWalls.append(cell+width)
-      self.walls.append(cellWalls)
-
-  def remove_wall(self, u, v):
-    self.walls[u].remove(v)
-    self.walls[v].remove(u)
-
-  def find(self, parent, i):
-    while parent[i] >= 0:
-      i = parent[i]
-    return i
-
-  def union(self, parent, a, b):
-    parent_a = self.find(parent, a)
-    weight_a = parent[parent_a]
-    parent_b = self.find(parent, b)
-    weight_b = parent[parent_b]
-    if weight_a < weight_b:
-      parent[parent_a] = parent_b
-      parent[parent_b] = weight_a + weight_b
-    else:
-      parent[parent_b] = parent_a
-      parent[parent_a] = weight_a + weight_b
-
-  def is_same_set(self, parent, a, b):
-    return self.find(parent, a) == self.find(parent, b)
-
-  def get_available_neighbors(self, cell):
-    available = []
-    x = int(cell % self.width)
-    y = int(cell / self.width)
-    if x != 0 and not self.visited[cell-1]:
-      available.append(cell-1)
-    if x != width-1 and not self.visited[cell+1]:
-      available.append(cell+1)
-    if y != 0 and not self.visited[cell-width]:
-      available.append(cell - width)
-    if y != height-1 and not self.visited[cell+width]:
-      available.append(cell + width)
-    return available
-
-  def get_visited_neighbors(self, cell):
-    taken = []
-    x = int(cell % self.width)
-    y = int(cell / self.width)
-    if x != 0 and self.visited[cell-1]:
-      taken.append(cell-1)
-    if x != width-1 and self.visited[cell+1]:
-      taken.append(cell+1)
-    if y != 0 and self.visited[cell-width]:
-      taken.append(cell - width)
-    if y != height-1 and self.visited[cell+width]:
-      taken.append(cell + width)
-    return taken
-
-  def get_neighbors(self, cell):
-    neighbors = []
-    x = int(cell % self.width)
-    y = int(cell / self.width)
-    if x != 0:
-      neighbors.append(cell-1)
-    if x != width-1:
-      neighbors.append(cell+1)
-    if y != 0:
-      neighbors.append(cell - width)
-    if y != height-1:
-      neighbors.append(cell + width)
-    return neighbors
-  ##############################################################################
-
-  def __init__(self, width, height):
+  def reset_maze(self, width, height, screen):
     self.width = width
     self.height = height
     self.total = width * height
-    self.path = [[] for i in range(self.total)]
-    self.start = 0
-    self.end = self.total - 1
-    self.visited = [False for i in range(self.total)]
+    self.screen = screen
+    self.start_x = int(((WINDOW_WIDTH / 3 * 2) - (self.width * (TILE_SIZE + WALL_SIZE)) + WALL_SIZE) / 2)
+    self.start_y = int((WINDOW_HEIGHT - (self.height * (TILE_SIZE + WALL_SIZE)) + WALL_SIZE) / 2)
+    self.grid = [[0 for x in range(width)] for y in range(height)]
+    self.path = [[[] for x in range(width)] for y in range(height)]
 
-  def generate_dfs(self):
-    stack = [randrange(self.total)]
+  def draw_maze(self):
+    self.screen.fill(BLACK)
+    for y in range(self.height):
+      for x in range(self.width):
+        self.draw_cell(x, y)
+        self.draw_walls(x, y)
+
+  def draw_cell(self, x, y):
+    cell = self.grid[y][x]
+    cell_x = self.start_x + (x * (TILE_SIZE + WALL_SIZE))
+    cell_y = self.start_y + (y * (TILE_SIZE + WALL_SIZE))
+    pygame.draw.rect(self.screen, CELL_COLORS[cell], (cell_x, cell_y, TILE_SIZE, TILE_SIZE))
+
+  def draw_walls(self, x, y):
+    cell_x = self.start_x + (x * (TILE_SIZE + WALL_SIZE))
+    cell_y = self.start_y + (y * (TILE_SIZE + WALL_SIZE))
+    for door in self.path[y][x]:
+      x2 = door[0]
+      y2 = door[1]
+      cell2 = self.grid[y2][x2]
+      color = CELL_COLORS[cell2] if CELL_COLORS[cell2] != RED else WHITE
+      if x2 > x:
+        pygame.draw.rect(self.screen, color, ((cell_x + TILE_SIZE, cell_y), ROW_WALL))
+      elif x2 < x:
+        pygame.draw.rect(self.screen, color, ((cell_x - WALL_SIZE, cell_y), ROW_WALL))
+      if y2 > y:
+        pygame.draw.rect(self.screen, color, ((cell_x, cell_y + TILE_SIZE), COL_WALL))
+      elif y2 < y:
+        pygame.draw.rect(self.screen, color, ((cell_x, cell_y - WALL_SIZE), COL_WALL))
+
+  def animate(self, x, y, delay):
+    self.draw_cell(x, y)
+    self.draw_walls(x, y)
+    pygame.time.wait(delay)
+
+  def create_walls(self):
+    walls = [[[] for x in range(self.width)] for y in range(self.height)]
+    for y in range(self.height):
+      for x in range(self.width):
+        curr = walls[y][x]
+        if x != 0:
+          curr.append((x-1, y))
+        if x != self.width-1
+          curr.append((x+1, y))
+        if y != 0:
+          curr.append((x, y-1))
+        if y != self.height-1:
+          curr.append((x, y+1))
+    return walls
+
+  def remove_wall(self, walls, ux, uy, vx, vy):
+    walls[uy][ux].remove((vx, vy))
+    walls[vy][vx].remove((ux, uy))
+
+  def get_available_neighbors(self, x, y):
+    available = []
+    if x != 0 and self.grid[y][x-1] == 0:
+      available.append((x-1, y))
+    if x != self.width-1 and self.grid[y][x+1] == 0:
+      available.append((x+1, y))
+    if y != 0 and self.grid[y-1][x] == 0:
+      available.append((x, y-1))
+    if y != self.height-1 and self.grid[y+1][x] == 0:
+      available.append((x, y+1))
+    return available
+
+  """
+  Generates a maze using randomized depth-first search:
+  1) Pick a random current cell as starting cell.
+  2) Pick a random unvisited neighbor cell of that current cell.
+  3) Form a path between the two cells and mark the neighbor cell as visited.
+  4) Repeat 2-3 with the neighbor cell as the new current cell.
+  5) If there are no unvisited neighbor cells, backtrack the current cells
+      until there is one.
+  6) Complete if current cell is starting cell again.
+  """
+  def generate_dfs(self, delay):
+    stack = [(randrange(self.width), randrange(self.height))]
     while stack:
       top = stack[-1]
-      self.visited[top] = True
-      neighbors = self.get_available_neighbors(top)
+      x1 = top[0]
+      y1 = top[1]
+      if self.grid[y1][x1] != 1:
+        self.grid[y1][x1] = 1
+        self.animate(x1, y1, delay)
+      neighbors = self.get_available_neighbors(x1, y1)
       if neighbors:
         selected = neighbors[randrange(len(neighbors))]
-        self.path[selected].append(top)
-        self.path[top].append(selected)
+        x2 = selected[0]
+        y2 = selected[1]
+        self.path[y1][x1].append(selected)
+        self.path[y2][x2].append(top)
         stack.append(selected)
       else:
         stack.pop()
+        self.grid[y1][x1] = 2
+        self.animate(x1, y1, delay)
+
+  def generate_kruskal(self, delay):
+    walls = create_walls()
+    disjoint_set = [-1 for i in range]
+
+  def generate(self, algorithm, delay):
+    self.reset_maze(self.width, self.height, self.screen)
+    if algorithm == "DFS":
+      self.generate_dfs(delay)
+    elif algorithm == "Kruskal":
+      print('sike')
+    self.grid[0][0] = 3
+    self.grid[self.height-1][self.width-1] = 3
     return self.path
-
-  def generate_kruskal(self):
-    self.create_walls()
-    disjoint_set = [-1 for i in range(self.total)]
-    cell_indexes = [i for i in range(len(self.walls))]
-    while -self.total not in disjoint_set:
-      rand_cell = cell_indexes[randrange(len(cell_indexes))]
-      rand_wall_index = randrange(len(self.walls[rand_cell]))
-      neighbor = self.walls[rand_cell][rand_wall_index]
-      if not self.is_same_set(disjoint_set, rand_cell, neighbor):
-        self.remove_wall(rand_cell, neighbor)
-        self.union(disjoint_set, rand_cell, neighbor)
-        self.path[rand_cell].append(neighbor)
-        self.path[neighbor].append(rand_cell)
-        if len(self.walls[rand_cell]) == 0:
-          cell_indexes.remove(rand_cell)
-        if len(self.walls[neighbor]) == 0:
-          cell_indexes.remove(neighbor)
-    return self.path
-
-  def generate_prim(self):
-    start = randrange(self.total)
-    self.visited[start] = True
-    adjacent = self.get_available_neighbors(start)
-    while adjacent:
-      next = adjacent[randrange(len(adjacent))]
-      adjacent.remove(next)
-      self.visited[next] = True
-      visited_neighbors = self.get_visited_neighbors(next)
-      connector = visited_neighbors[randrange(len(visited_neighbors))]
-      self.path[next].append(connector)
-      self.path[connector].append(next)
-      for available in self.get_available_neighbors(next):
-        if available not in adjacent:
-          adjacent.append(available)
-    return self.path
-
-  def generate_wilson(self):
-    start = randrange(self.total)
-    self.visited[start] = True
-    while False in self.visited:
-      stack = []
-      current = randrange(self.total)
-      while self.visited[current]:
-        current = randrange(self.total)
-      stack.append(current)
-      while stack and not self.visited[stack[-1]]:
-        neighbors = self.get_neighbors(current)
-        current = neighbors[randrange(len(neighbors))]
-        if current in stack:
-          while current in stack:
-            stack.pop()
-          if stack:
-            current = stack[-1]
-        else:
-          stack.append(current)
-      while len(stack) > 1:
-        current = stack[-1]
-        stack.pop()
-        next = stack[-1]
-        self.visited[current] = True
-        self.visited[next] = True
-        self.path[current].append(next)
-        self.path[next].append(current)
-    return self.path
-
-  def generate_eller(self):
-    self.ellers(0, [-1 for i in range(self.total)])
-    return self.path
-
-  def ellers(self, row, disjoint_set):
-    if row == self.height-1:
-      for i in range(self.width-1):
-        cell = (row * self.width) + i
-        if not self.is_same_set(disjoint_set, cell, cell+1):
-          self.path[cell].append(cell+1)
-          self.path[cell+1].append(cell)
-          self.union(disjoint_set, cell, cell+1)
-    elif row < self.height-1:
-      for i in range(self.width-1):
-        cell = (row * self.width) + i
-        if bool(getrandbits(1)) and not self.is_same_set(disjoint_set, cell, cell+1):
-          self.union(disjoint_set, cell, cell+1)
-          self.path[cell].append(cell+1)
-          self.path[cell+1].append(cell)
-      for i in range(self.width):
-        cell = (row * self.width) + i
-        cell_set = disjoint_set[cell]
-        if cell_set < 0 or bool(getrandbits(1)):
-          self.union(disjoint_set, cell+width, cell)
-          self.path[cell].append(cell+self.width)
-          self.path[cell+self.width].append(cell)
-      self.ellers(row+1, disjoint_set)
-
-  def generate_hunt_kill(self):
-    current = randrange(self.total)
-    self.visited[current] = True
-    while current != -1:
-      neighbors = self.get_available_neighbors(current)
-      self.kill(current, neighbors)
-      current = self.hunt()
-    return self.path
-
-  def hunt(self):
-    cell = 0
-    while cell < self.total:
-      visited_neighbors = self.get_visited_neighbors(cell)
-      if not self.visited[cell] and visited_neighbors:
-        selected_neighbor = visited_neighbors[randrange(len(visited_neighbors))]
-        self.path[selected_neighbor].append(cell)
-        self.path[cell].append(selected_neighbor)
-        self.visited[cell] = True
-        return cell
-      cell += 1
-    return -1
-
-  def kill(self, current, neighbors):
-    if neighbors:
-      next = neighbors[randrange(len(neighbors))]
-      self.path[current].append(next)
-      self.path[next].append(current)
-      self.visited[next] = True
-      current = next
-      neighbors = self.get_available_neighbors(current)
-      self.kill(current, neighbors)
-
-  def solve_bfs(self):
-    self.solution = []
-    parents = [-1 for i in range(self.total)]
-    queue = [self.start]
-    current = queue[0]
-    parents[current] = current
-    while queue:
-      current = queue.pop(0)
-      neighbors = self.path[current]
-      if current == self.end:
-        while parents[current] != current:
-          self.solution.insert(0, current)
-          current = parents[current]
-        self.solution.insert(0, current)
-        return self.solution
-      for cell in neighbors:
-        if parents[cell] == -1:
-          parents[cell] = current
-          queue.append(cell)
-    return self.solution
-
-  def reset_maze(self):
-    self.path = [[] for i in range(self.total)]
-    self.solution = []
-    self.visited = [False for i in range(self.total)]
-
-  def set_dimensions(self, width, height):
-    self.width = width
-    self.height = height
-    self.total = width * height
-    self.reset_maze()
-
-  def to_string(self):
-    return self.to_string_with_solution(False)
-
-  def to_string_with_solution(self, is_solution):
-    vert = [["|  "] * self.width + ["|"] for i in range(self.height)] + [[]]
-    horz = [["+--"] * self.width + ["+"] for i in range(self.height+1)]
-    for current in range(self.total):
-      path = self.path[current]
-      x = int(current % self.width)
-      y = int(current / self.width)
-      if is_solution and current in self.solution:
-        vert[y][x] = vert[y][x][0] + "[]"
-      if current+1 in path:
-        vert[y][x+1] = "   "
-      if current+self.width in path:
-        horz[y+1][x] = "+  "
-    maze = ""
-    for (a, b) in zip(horz, vert):
-        maze += ''.join(a + ['\n'] + b + ['\n'])
-    return maze
-
-#width = int(input("Enter a width: "))
-#height = int(input("Enter a height: "))
-width = 25
-height = 25
-obj = Maze(width, height)
-#print("DFS")
-#print(timeit.timeit(obj.generate_dfs, number=1))
-#obj.reset_maze()
-#print("Kruskal")
-#print(timeit.timeit(obj.generate_kruskal, number=1))
-#obj.reset_maze()
-#print("Prim")
-#print(timeit.timeit(obj.generate_prim, number=1))
-#obj.reset_maze()
-#print("Wilson")
-#print(timeit.timeit(obj.generate_wilson, number=1))
-obj.generate_wilson()
-obj.solve_bfs()
-print(obj.to_string())
-print(obj.to_string_with_solution(True))
