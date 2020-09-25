@@ -28,4 +28,11 @@ GREY = (33, 40, 45)
 BLUE = (0, 204, 204)
 RED = (255, 0, 0)
 
-GEN_ALGORITHMS = ["DFS", "Kruskal"]
+GEN_ALGORITHMS = ["DFS", "Kruskal", "Prim"]
+
+STAGES = {
+  "UNVISITED": GREY,
+  "PROCESSED": BLUE,
+  "VISITED": WHITE,
+  "SPECIAL": RED
+}

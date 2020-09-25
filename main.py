@@ -144,6 +144,7 @@ def main():
         animation_slider_event(maze)
 
   def draw_default():
+    screen.fill(BLACK)
     maze.draw_maze()
     pygame.draw.rect(screen, GREY, gui)
     screen.blit(text, text_rect)

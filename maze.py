@@ -18,13 +18,7 @@ COL_WALL = constants.COL_WALL
 DEFAULT_WIDTH = constants.DEFAULT_WIDTH
 DEFAULT_HEIGHT = constants.DEFAULT_HEIGHT
 
-BLACK = constants.BLACK
-WHITE = constants.WHITE
-GREY = constants.GREY
-BLUE = constants.BLUE
-RED = constants.RED
-
-CELL_COLORS = [GREY, BLUE, WHITE, RED]
+STAGES = constants.STAGES
 
 class Maze:
   def __init__(self, width, height, screen):
@@ -39,30 +33,30 @@ class Maze:
     self.screen = screen
     self.start_x = int(((WINDOW_WIDTH / 3 * 2) - (self.width * (TILE_SIZE + WALL_SIZE)) + WALL_SIZE) / 2)
     self.start_y = int((WINDOW_HEIGHT - (self.height * (TILE_SIZE + WALL_SIZE)) + WALL_SIZE) / 2)
-    self.grid = [[0 for x in range(width)] for y in range(height)]
+    self.grid = [["UNVISITED" for x in range(width)] for y in range(height)]
     self.path = [[[] for x in range(width)] for y in range(height)]
 
   def draw_maze(self):
-    self.screen.fill(BLACK)
     for y in range(self.height):
       for x in range(self.width):
-        self.draw_cell(x, y)
-        self.draw_walls(x, y)
+        self.draw_cell((x, y))
+        self.draw_walls((x, y))
 
-  def draw_cell(self, x, y):
-    cell = self.grid[y][x]
+  def draw_cell(self, cell):
+    x, y = cell
+    val = self.get_grid(cell)
     cell_x = self.start_x + (x * (TILE_SIZE + WALL_SIZE))
     cell_y = self.start_y + (y * (TILE_SIZE + WALL_SIZE))
-    pygame.draw.rect(self.screen, CELL_COLORS[cell], (cell_x, cell_y, TILE_SIZE, TILE_SIZE))
+    pygame.draw.rect(self.screen, STAGES[val], (cell_x, cell_y, TILE_SIZE, TILE_SIZE))
 
-  def draw_walls(self, x, y):
+  def draw_walls(self, cell):
+    x, y = cell
     cell_x = self.start_x + (x * (TILE_SIZE + WALL_SIZE))
     cell_y = self.start_y + (y * (TILE_SIZE + WALL_SIZE))
-    for door in self.path[y][x]:
-      x2 = door[0]
-      y2 = door[1]
-      cell2 = self.grid[y2][x2]
-      color = CELL_COLORS[cell2] if CELL_COLORS[cell2] != RED else WHITE
+    for wall in self.path[y][x]:
+      x2, y2 = wall
+      neighbor = self.get_grid(wall)
+      color = STAGES[neighbor] if neighbor != "SPECIAL" else STAGES["VISITED"]
       if x2 > x:
         pygame.draw.rect(self.screen, color, ((cell_x + TILE_SIZE, cell_y), ROW_WALL))
       elif x2 < x:
@@ -75,45 +69,25 @@ class Maze:
   def visit(self, cell, val, delay):
     x, y = cell
     self.grid[y][x] = val
-    self.draw_cell(x, y)
-    self.draw_walls(x, y)
+    self.draw_cell(cell)
+    self.draw_walls(cell)
     pygame.time.wait(delay)
 
-  """
   def create_walls(self):
-    walls = [[[] for x in range(self.width)] for y in range(self.height)]
+    walls = []
     for y in range(self.height):
       for x in range(self.width):
-        curr = walls[y][x]
-        if x != 0:
-          curr.append((x-1, y))
         if x != self.width-1:
-          curr.append((x+1, y))
-        if y != 0:
-          curr.append((x, y-1))
+          walls.append([(x, y), (x+1, y)])
         if y != self.height-1:
-          curr.append((x, y+1))
-    return walls
-    """
-  def create_walls(self):
-    walls = {}
-    for y in range(self.height):
-      for x in range(self.width):
-        curr = []
-        if x != 0:
-          curr.append((x-1, y))
-        if x != self.width-1:
-          curr.append((x+1, y))
-        if y != 0:
-          curr.append((x, y-1))
-        if y != self.height-1:
-          curr.append((x, y+1))
-        walls[(x, y)] = curr
+          walls.append([(x, y), (x, y+1)])
     return walls
 
   def remove_wall(self, walls, u, v):
-    walls[u[1]][u[0]].remove(v)
-    walls[v[1]][v[0]].remove(u)
+    x1, y1 = u
+    x2, y2 = v
+    walls[y1][x1].remove(v)
+    walls[y2][x2].remove(u)
 
   def find(self, parent, i):
     while parent[i] >= 0:
@@ -138,13 +112,13 @@ class Maze:
   def get_available_neighbors(self, cell):
     x, y = cell
     available = []
-    if x != 0 and self.grid[y][x-1] == 0:
+    if x != 0 and self.get_grid((x-1, y)) == "UNVISITED":
       available.append((x-1, y))
-    if x != self.width-1 and self.grid[y][x+1] == 0:
+    if x != self.width-1 and self.get_grid((x+1, y)) == "UNVISITED":
       available.append((x+1, y))
-    if y != 0 and self.grid[y-1][x] == 0:
+    if y != 0 and self.get_grid((x, y-1)) == "UNVISITED":
       available.append((x, y-1))
-    if y != self.height-1 and self.grid[y+1][x] == 0:
+    if y != self.height-1 and self.get_grid((x, y+1)) == "UNVISITED":
       available.append((x, y+1))
     return available
 
@@ -154,7 +128,7 @@ class Maze:
     self.path[y1][x1].append(neighbor)
     self.path[y2][x2].append(cell)
 
-  def get_cell(self, cell):
+  def get_grid(self, cell):
     x, y = cell
     return self.grid[y][x]
 
@@ -176,8 +150,8 @@ class Maze:
     stack = [(randrange(self.width), randrange(self.height))]
     while stack:
       top = stack[-1]
-      if self.get_cell(top) != 1:
-        self.visit(top, 1, delay)
+      if self.get_grid(top) != "PROCESSED":
+        self.visit(top, "PROCESSED", delay)
       neighbors = self.get_available_neighbors(top)
       if neighbors:
         selected = random.choice(neighbors)
@@ -185,25 +159,51 @@ class Maze:
         stack.append(selected)
       else:
         stack.pop()
-        self.visit(top, 2, delay)
+        self.visit(top, "VISITED", delay)
 
+  """
+  Generates a maze using randomized kruskal's algorithm:
+  1) Create a list of all walls, and create a disjointed set for each cell
+      containing only that cell.
+  2) Choose a random wall and remove it from the list.
+  3) If the two cells adjacent to that wall are from different sets, remove the
+      wall and form a path between the two cells. Mark them as visited.
+  4) Repeat 2-3 until all cells are in the same set.
+  Note that if the two cells adjacent to the wall are from the same set, it skips
+    that wall.
+  """
   def generate_kruskal(self, delay):
     walls = self.create_walls()
     disjoint_set = [-1 for i in range(self.total)]
     while -self.total not in disjoint_set:
-      cell, neighbors = random.choice(list(walls.items()))
-      if self.get_cell(cell) != 2:
-        self.visit(cell, 2, delay)
-      selected = random.choice(neighbors)
-      neighbors.remove(selected)
-      if not neighbors:
-        walls.pop(cell)
+      wall = random.choice(walls)
+      walls.remove(wall)
+      cell, selected = wall
       cell_num = self.get_number(cell)
       selected_num = self.get_number(selected)
       if not self.is_same_set(disjoint_set, cell_num, selected_num):
         self.union(disjoint_set, cell_num, selected_num)
         self.connect(cell, selected)
-        self.visit(selected, 2, delay)
+        self.visit(cell, "VISITED", delay)
+        self.visit(selected, "VISITED", delay)
+
+  def generate_prim(self, delay):
+    start = (randrange(self.width), randrange(self.height))
+    self.visit(start, "VISITED", delay)
+    neighbors = self.get_available_neighbors(start)
+    walls = []
+    for neighbor in neighbors:
+      walls.append([start, neighbor])
+    while walls:
+      wall = random.choice(walls)
+      cell, selected = wall
+      walls.remove(wall)
+      if self.get_grid(selected) != "VISITED":
+        self.connect(cell, selected)
+        self.visit(selected, "VISITED", delay)
+        neighbors = self.get_available_neighbors(selected)
+        for neighbor in neighbors:
+          walls.append([selected, neighbor])
 
   def generate(self, algorithm, delay):
     self.reset_maze(self.width, self.height, self.screen)
@@ -211,8 +211,10 @@ class Maze:
       self.generate_dfs(delay)
     elif algorithm == "Kruskal":
       self.generate_kruskal(delay)
+    elif algorithm == "Prim":
+      self.generate_prim(delay)
     x1, y1 = self.start
-    self.grid[y1][x1] = 3
+    self.grid[y1][x1] = "SPECIAL"
     x2, y2 = self.end
-    self.grid[y2][x2] = 3
+    self.grid[y2][x2] = "SPECIAL"
     return self.path
