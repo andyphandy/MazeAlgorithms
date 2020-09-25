@@ -1,4 +1,5 @@
-from random import randrange, getrandbits
+import random
+from random import randrange
 from collections import defaultdict
 import time
 import pygame
@@ -33,6 +34,8 @@ class Maze:
     self.width = width
     self.height = height
     self.total = width * height
+    self.start = (0, 0)
+    self.end = (self.width-1, self.height-1)
     self.screen = screen
     self.start_x = int(((WINDOW_WIDTH / 3 * 2) - (self.width * (TILE_SIZE + WALL_SIZE)) + WALL_SIZE) / 2)
     self.start_y = int((WINDOW_HEIGHT - (self.height * (TILE_SIZE + WALL_SIZE)) + WALL_SIZE) / 2)
@@ -69,11 +72,14 @@ class Maze:
       elif y2 < y:
         pygame.draw.rect(self.screen, color, ((cell_x, cell_y - WALL_SIZE), COL_WALL))
 
-  def animate(self, x, y, delay):
+  def visit(self, cell, val, delay):
+    x, y = cell
+    self.grid[y][x] = val
     self.draw_cell(x, y)
     self.draw_walls(x, y)
     pygame.time.wait(delay)
 
+  """
   def create_walls(self):
     walls = [[[] for x in range(self.width)] for y in range(self.height)]
     for y in range(self.height):
@@ -81,19 +87,56 @@ class Maze:
         curr = walls[y][x]
         if x != 0:
           curr.append((x-1, y))
-        if x != self.width-1
+        if x != self.width-1:
           curr.append((x+1, y))
         if y != 0:
           curr.append((x, y-1))
         if y != self.height-1:
           curr.append((x, y+1))
     return walls
+    """
+  def create_walls(self):
+    walls = {}
+    for y in range(self.height):
+      for x in range(self.width):
+        curr = []
+        if x != 0:
+          curr.append((x-1, y))
+        if x != self.width-1:
+          curr.append((x+1, y))
+        if y != 0:
+          curr.append((x, y-1))
+        if y != self.height-1:
+          curr.append((x, y+1))
+        walls[(x, y)] = curr
+    return walls
 
-  def remove_wall(self, walls, ux, uy, vx, vy):
-    walls[uy][ux].remove((vx, vy))
-    walls[vy][vx].remove((ux, uy))
+  def remove_wall(self, walls, u, v):
+    walls[u[1]][u[0]].remove(v)
+    walls[v[1]][v[0]].remove(u)
 
-  def get_available_neighbors(self, x, y):
+  def find(self, parent, i):
+    while parent[i] >= 0:
+      i = parent[i]
+    return i
+
+  def union(self, parent, a, b):
+    parent_a = self.find(parent, a)
+    weight_a = parent[parent_a]
+    parent_b = self.find(parent, b)
+    weight_b = parent[parent_b]
+    if weight_a < weight_b:
+      parent[parent_a] = parent_b
+      parent[parent_b] = weight_a + weight_b
+    else:
+      parent[parent_b] = parent_a
+      parent[parent_a] = weight_a + weight_b
+
+  def is_same_set(self, parent, a, b):
+    return self.find(parent, a) == self.find(parent, b)
+
+  def get_available_neighbors(self, cell):
+    x, y = cell
     available = []
     if x != 0 and self.grid[y][x-1] == 0:
       available.append((x-1, y))
@@ -104,6 +147,20 @@ class Maze:
     if y != self.height-1 and self.grid[y+1][x] == 0:
       available.append((x, y+1))
     return available
+
+  def connect(self, cell, neighbor):
+    x1, y1 = cell
+    x2, y2 = neighbor
+    self.path[y1][x1].append(neighbor)
+    self.path[y2][x2].append(cell)
+
+  def get_cell(self, cell):
+    x, y = cell
+    return self.grid[y][x]
+
+  def get_number(self, cell):
+    x, y = cell
+    return (self.width * y) + x
 
   """
   Generates a maze using randomized depth-first search:
@@ -119,34 +176,43 @@ class Maze:
     stack = [(randrange(self.width), randrange(self.height))]
     while stack:
       top = stack[-1]
-      x1 = top[0]
-      y1 = top[1]
-      if self.grid[y1][x1] != 1:
-        self.grid[y1][x1] = 1
-        self.animate(x1, y1, delay)
-      neighbors = self.get_available_neighbors(x1, y1)
+      if self.get_cell(top) != 1:
+        self.visit(top, 1, delay)
+      neighbors = self.get_available_neighbors(top)
       if neighbors:
-        selected = neighbors[randrange(len(neighbors))]
-        x2 = selected[0]
-        y2 = selected[1]
-        self.path[y1][x1].append(selected)
-        self.path[y2][x2].append(top)
+        selected = random.choice(neighbors)
+        self.connect(top, selected)
         stack.append(selected)
       else:
         stack.pop()
-        self.grid[y1][x1] = 2
-        self.animate(x1, y1, delay)
+        self.visit(top, 2, delay)
 
   def generate_kruskal(self, delay):
-    walls = create_walls()
-    disjoint_set = [-1 for i in range]
+    walls = self.create_walls()
+    disjoint_set = [-1 for i in range(self.total)]
+    while -self.total not in disjoint_set:
+      cell, neighbors = random.choice(list(walls.items()))
+      if self.get_cell(cell) != 2:
+        self.visit(cell, 2, delay)
+      selected = random.choice(neighbors)
+      neighbors.remove(selected)
+      if not neighbors:
+        walls.pop(cell)
+      cell_num = self.get_number(cell)
+      selected_num = self.get_number(selected)
+      if not self.is_same_set(disjoint_set, cell_num, selected_num):
+        self.union(disjoint_set, cell_num, selected_num)
+        self.connect(cell, selected)
+        self.visit(selected, 2, delay)
 
   def generate(self, algorithm, delay):
     self.reset_maze(self.width, self.height, self.screen)
     if algorithm == "DFS":
       self.generate_dfs(delay)
     elif algorithm == "Kruskal":
-      print('sike')
-    self.grid[0][0] = 3
-    self.grid[self.height-1][self.width-1] = 3
+      self.generate_kruskal(delay)
+    x1, y1 = self.start
+    self.grid[y1][x1] = 3
+    x2, y2 = self.end
+    self.grid[y2][x2] = 3
     return self.path
