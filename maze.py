@@ -383,17 +383,16 @@ class Maze:
     while queue:
       cell = queue.pop(0)
       if self.get_grid(cell) != "SPECIAL":
-        self.visit(cell, "PROCESSED", delay)
+        self.visit(cell, "PROCESSED", int(delay / max(len(queue), 1)))
       x, y = cell
       if cell == self.end:
         while parents[y][x] != cell:
           self.solution.insert(0, cell)
           if self.get_grid(cell) != "SPECIAL":
-            self.visit(cell, "PATHFIND", delay)
+            self.visit(cell, "PATHFIND", min(delay, 50))
           cell = parents[y][x]
           x, y = cell
         self.solution.insert(0, cell)
-        self.visit(cell, "PATHFIND", delay)
         return self.solution
       else:
         neighbors = self.path[y][x]
