@@ -1,5 +1,5 @@
 import random
-from random import randrange
+from random import randrange, getrandbits
 from collections import defaultdict
 import time
 import pygame
@@ -73,7 +73,7 @@ class Maze:
     self.draw_walls(cell)
     pygame.time.wait(delay)
 
-  def create_walls(self):
+  def create_all_walls(self):
     walls = []
     for y in range(self.height):
       for x in range(self.width):
@@ -109,6 +109,32 @@ class Maze:
   def is_same_set(self, parent, a, b):
     return self.find(parent, a) == self.find(parent, b)
 
+  def get_neighbors(self, cell):
+    x, y = cell
+    neighbors = []
+    if x != 0:
+      neighbors.append((x-1, y))
+    if x != self.width-1:
+      neighbors.append((x+1, y))
+    if y != 0:
+      neighbors.append((x, y-1))
+    if y != self.height-1:
+      neighbors.append((x, y+1))
+    return neighbors
+
+  def get_visited_neighbors(self, cell):
+    x, y = cell
+    visited = []
+    if x != 0 and self.get_grid((x-1, y)) == "VISITED":
+      visited.append((x-1, y))
+    if x != self.width-1 and self.get_grid((x+1, y)) == "VISITED":
+      visited.append((x+1, y))
+    if y != 0 and self.get_grid((x, y-1)) == "VISITED":
+      visited.append((x, y-1))
+    if y != self.height-1 and self.get_grid((x, y+1)) == "VISITED":
+      visited.append((x, y+1))
+    return visited
+
   def get_available_neighbors(self, cell):
     x, y = cell
     available = []
@@ -135,6 +161,13 @@ class Maze:
   def get_number(self, cell):
     x, y = cell
     return (self.width * y) + x
+
+  def is_generated(self):
+    for row in self.grid:
+      for col in row:
+        if col != "VISITED":
+          return False
+    return True
 
   """
   Generates a maze using randomized depth-first search:
@@ -173,7 +206,7 @@ class Maze:
     that wall.
   """
   def generate_kruskal(self, delay):
-    walls = self.create_walls()
+    walls = self.create_all_walls()
     disjoint_set = [-1 for i in range(self.total)]
     while -self.total not in disjoint_set:
       wall = random.choice(walls)
@@ -184,11 +217,13 @@ class Maze:
       if not self.is_same_set(disjoint_set, cell_num, selected_num):
         self.union(disjoint_set, cell_num, selected_num)
         self.connect(cell, selected)
-        self.visit(cell, "VISITED", delay)
+        self.visit(cell, "PROCESSED", delay)
+        self.visit(cell, "VISITED", 0)
         self.visit(selected, "VISITED", delay)
 
   def generate_prim(self, delay):
     start = (randrange(self.width), randrange(self.height))
+    self.visit(start, "PROCESSED", delay)
     self.visit(start, "VISITED", delay)
     neighbors = self.get_available_neighbors(start)
     walls = []
@@ -200,10 +235,107 @@ class Maze:
       walls.remove(wall)
       if self.get_grid(selected) != "VISITED":
         self.connect(cell, selected)
-        self.visit(selected, "VISITED", delay)
+        self.visit(selected, "PROCESSED", delay)
+        self.visit(selected, "VISITED", 0)
         neighbors = self.get_available_neighbors(selected)
         for neighbor in neighbors:
           walls.append([selected, neighbor])
+
+  def generate_wilson(self, delay):
+    self.visit((randrange(self.width), randrange(self.height)), "VISITED", delay)
+    while not self.is_generated():
+      stack = []
+      start = (randrange(self.width), randrange(self.height))
+      while self.get_grid(start) != "UNVISITED":
+        start = (randrange(self.width), randrange(self.height))
+      stack.append(start)
+      self.visit(start, "PROCESSED", delay)
+      while stack and self.get_grid(stack[-1]) != "VISITED":
+        top = stack[-1]
+        neighbors = self.get_neighbors(top)
+        selected = random.choice(neighbors)
+        if self.get_grid(selected) != "VISITED":
+          self.visit(selected, "PROCESSED", delay)
+        if selected in stack:
+          while selected in stack and len(stack) > 1:
+            self.visit(stack.pop(), "UNVISITED", 0)
+        else:
+          stack.append(selected)
+      while len(stack) > 1:
+        top = stack.pop()
+        next = stack[-1]
+        self.connect(top, next)
+        self.visit(next, "VISITED", delay)
+
+  def generate_eller(self, delay):
+    self.ellers(0, [-1 for i in range(self.total)], delay)
+
+  def ellers(self, row, disjoint_set, delay):
+    if row == self.height - 1:
+      self.ellers_row_operation(row, disjoint_set, delay)
+    elif row < self.height - 1:
+      self.ellers_row_operation(row, disjoint_set, delay, True)
+      for i in range(self.width):
+        cell_num = (row * self.width) + i
+        cell_set = disjoint_set[cell_num]
+        if cell_set < 0 or getrandbits(1):
+          self.union(disjoint_set, cell_num + self.width, cell_num)
+          self.connect((i, row), (i, row+1))
+        self.visit((i, row+1), "PROCESSED", delay)
+      self.ellers(row+1, disjoint_set, delay)
+
+  def ellers_row_operation(self, row, disjoint_set, delay, is_random=False):
+    for i in range(self.width - 1):
+      self.visit((i, row), "VISITED", delay)
+      self.visit((i+1, row), "VISITED", 0)
+      cell_num = (row * self.width) + i
+      rand = getrandbits(1) if is_random else 1
+      if rand and not self.is_same_set(disjoint_set, cell_num, cell_num+1):
+        self.connect((i, row), (i+1, row))
+        self.union(disjoint_set, cell_num, cell_num+1)
+        self.visit((i, row), "VISITED", delay)
+
+  def generate_hunt_and_kill(self, delay):
+    cell = (randrange(self.width), randrange(self.height))
+    self.visit(cell, "VISITED", delay)
+    min_row = 0
+    while not self.is_generated():
+      self.kill(cell, delay)
+      cell = self.hunt(min_row, delay)
+      min_row = self.hunt_get_min_row(min_row)
+
+  def hunt(self, min_row, delay):
+    for y in range(min_row, self.height):
+      for x in range(self.width):
+        cell = (x, y)
+        prev_state = self.get_grid(cell)
+        self.visit(cell, "PROCESSED", delay)
+        visited_neighbors = self.get_visited_neighbors(cell)
+        if prev_state != "VISITED" and visited_neighbors:
+          selected = random.choice(visited_neighbors)
+          self.connect(cell, selected)
+          self.visit(cell, "VISITED", delay)
+          return cell
+        else:
+          self.visit(cell, prev_state, delay)
+    return (0, 0)
+
+  def kill(self, cell, delay):
+    neighbors = self.get_available_neighbors(cell)
+    if neighbors:
+      selected = random.choice(neighbors)
+      self.connect(cell, selected)
+      self.visit(selected, "PROCESSED", delay)
+      self.visit(selected, "VISITED", delay)
+      self.kill(selected, delay)
+
+  def hunt_get_min_row(self, min_row):
+    for y in range(min_row, self.height):
+      for x in range(self.width):
+        if self.get_grid((x, y)) != "VISITED":
+          return min_row
+      min_row = min_row + 1
+    return min_row
 
   def generate(self, algorithm, delay):
     self.reset_maze(self.width, self.height, self.screen)
@@ -213,6 +345,12 @@ class Maze:
       self.generate_kruskal(delay)
     elif algorithm == "Prim":
       self.generate_prim(delay)
+    elif algorithm == "Wilson":
+      self.generate_wilson(delay)
+    elif algorithm == "Eller":
+      self.generate_eller(delay)
+    elif algorithm == "Hunt and Kill":
+      self.generate_hunt_and_kill(delay)
     x1, y1 = self.start
     self.grid[y1][x1] = "SPECIAL"
     x2, y2 = self.end

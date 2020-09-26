@@ -19,7 +19,7 @@ DEFAULT_WIDTH = 10
 DEFAULT_HEIGHT = 10
 
 MIN_DELAY = 0
-MAX_DELAY = 1000
+MAX_DELAY = 500
 DEFAULT_DELAY = 50
 
 BLACK = (0, 0, 0)
@@ -27,12 +27,14 @@ WHITE = (255,255,255)
 GREY = (33, 40, 45)
 BLUE = (0, 204, 204)
 RED = (255, 0, 0)
+GREEN = (0, 255, 0)
 
-GEN_ALGORITHMS = ["DFS", "Kruskal", "Prim"]
+GEN_ALGORITHMS = ["DFS", "Kruskal", "Prim", "Wilson", "Eller", "Hunt and Kill"]
 
 STAGES = {
   "UNVISITED": GREY,
   "PROCESSED": BLUE,
   "VISITED": WHITE,
-  "SPECIAL": RED
+  "SPECIAL": RED,
+  "PATHFIND": GREEN
 }
