@@ -34,6 +34,7 @@ def main():
   DEFAULT_DELAY = constants.DEFAULT_DELAY
 
   GEN_ALGORITHMS = constants.GEN_ALGORITHMS
+  SOL_ALGORITHMS = constants.SOL_ALGORITHMS
 
   BLACK = constants.BLACK
   WHITE = constants.WHITE
@@ -83,7 +84,19 @@ def main():
   generate_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect(GUI_X_CENTER - 50, 320, 100, 50),
                                                  text='Generate',
                                                  manager=manager)
+  solve_label = pygame_gui.elements.UILabel(relative_rect=pygame.Rect((SLIDER_X, 400), SLIDER_SIZE),
+                                                 text="Solving Algorithm",
+                                                 manager=manager)
+  solve_menu = pygame_gui.elements.UIDropDownMenu(relative_rect=pygame.Rect((SLIDER_X, 420), SLIDER_SIZE),
+                                                       options_list=SOL_ALGORITHMS,
+                                                       starting_option=SOL_ALGORITHMS[0],
+                                                       manager=manager)
+  solve_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect(GUI_X_CENTER - 50, 460, 100, 50),
+                                                 text='Solve',
+                                                 manager=manager)
 
+  solve_menu.disable()
+  solve_button.disable()
 
   threads = []
 
@@ -107,6 +120,8 @@ def main():
       maze.reset_maze(width, height, screen)
       screen.fill(BLACK)
       maze.draw_maze()
+      solve_menu.disable()
+      solve_button.disable()
 
   def generate_button_event():
     disable_ui()
@@ -117,12 +132,23 @@ def main():
     threads.append(thread)
     thread.start()
 
+  def solve_button_event():
+    disable_ui()
+    algorithm = solve_menu.selected_option
+    delay = animation_slider.get_current_value()
+    thread = Thread(target=maze.solve, args=(algorithm, delay), kwargs={})
+    thread.daemon = True
+    threads.append(thread)
+    thread.start()
+
   def disable_ui():
     width_slider.disable()
     height_slider.disable()
     generate_button.disable()
     animation_slider.disable()
     generation_menu.disable()
+    solve_menu.disable()
+    solve_button.disable()
 
   def enable_ui():
     width_slider.enable()
@@ -130,11 +156,16 @@ def main():
     generate_button.enable()
     animation_slider.enable()
     generation_menu.enable()
+    if maze.is_generated():
+      solve_menu.enable()
+      solve_button.enable()
 
   def gui_event(event):
     if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
       if event.ui_element == generate_button:
         generate_button_event()
+      elif event.ui_element == solve_button:
+        solve_button_event()
     elif event.user_type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED:
       if event.ui_element == width_slider:
         size_slider_event(True)
@@ -161,7 +192,7 @@ def main():
     manager.update(time_delta)
     if threads and not threads[0].is_alive():
       enable_ui()
-      threads.pop()
+      threads.pop(0)
     draw_default()
     pygame.display.update()
 

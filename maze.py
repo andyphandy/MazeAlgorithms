@@ -35,6 +35,15 @@ class Maze:
     self.start_y = int((WINDOW_HEIGHT - (self.height * (TILE_SIZE + WALL_SIZE)) + WALL_SIZE) / 2)
     self.grid = [["UNVISITED" for x in range(width)] for y in range(height)]
     self.path = [[[] for x in range(width)] for y in range(height)]
+    self.solution = []
+
+  def restore_maze(self, solution_only=False):
+    for y in range(self.height):
+      for x in range(self.width):
+        if (x, y) == (0, 0) or (x, y) == (self.width-1, self.height-1):
+          self.grid[y][x] = "SPECIAL"
+        elif not (solution_only and self.get_grid((x, y)) == "PATHFIND"):
+          self.grid[y][x] = "VISITED"
 
   def draw_maze(self):
     for y in range(self.height):
@@ -55,8 +64,16 @@ class Maze:
     cell_y = self.start_y + (y * (TILE_SIZE + WALL_SIZE))
     for wall in self.path[y][x]:
       x2, y2 = wall
+      curr = self.get_grid(cell)
       neighbor = self.get_grid(wall)
-      color = STAGES[neighbor] if neighbor != "SPECIAL" else STAGES["VISITED"]
+      color = STAGES[neighbor]
+      if curr == "SPECIAL" or curr == "PATHFIND":
+        if neighbor == "SPECIAL" or neighbor == "PATHFIND":
+          color = STAGES["PATHFIND"]
+      elif neighbor == "SPECIAL":
+        color = STAGES[curr]
+      elif neighbor == "PATHFIND":
+        color = STAGES[curr]
       if x2 > x:
         pygame.draw.rect(self.screen, color, ((cell_x + TILE_SIZE, cell_y), ROW_WALL))
       elif x2 < x:
@@ -165,7 +182,7 @@ class Maze:
   def is_generated(self):
     for row in self.grid:
       for col in row:
-        if col != "VISITED":
+        if col != "VISITED" and col != "SPECIAL" and col != "PATHFIND":
           return False
     return True
 
@@ -355,4 +372,42 @@ class Maze:
     self.grid[y1][x1] = "SPECIAL"
     x2, y2 = self.end
     self.grid[y2][x2] = "SPECIAL"
+    return self.path
+
+  def solve_bfs(self, delay):
+    parents = [[(-1, -1) for x in range(self.width)] for y in range(self.height)]
+    queue = [self.start]
+    cell = queue[0]
+    x, y = cell
+    parents[y][x] = cell
+    while queue:
+      cell = queue.pop(0)
+      if self.get_grid(cell) != "SPECIAL":
+        self.visit(cell, "PROCESSED", delay)
+      x, y = cell
+      if cell == self.end:
+        while parents[y][x] != cell:
+          self.solution.insert(0, cell)
+          if self.get_grid(cell) != "SPECIAL":
+            self.visit(cell, "PATHFIND", delay)
+          cell = parents[y][x]
+          x, y = cell
+        self.solution.insert(0, cell)
+        self.visit(cell, "PATHFIND", delay)
+        return self.solution
+      else:
+        neighbors = self.path[y][x]
+        for neighbor in neighbors:
+          x2, y2 = neighbor
+          if parents[y2][x2] == (-1, -1):
+            parents[y2][x2] = cell
+            queue.append(neighbor)
+    return self.solution
+
+  def solve(self, algorithm, delay):
+    self.solution = []
+    self.restore_maze()
+    if algorithm == "BFS":
+      self.solve_bfs(delay)
+    self.restore_maze(True)
     return self.path

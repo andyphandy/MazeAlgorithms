@@ -30,6 +30,7 @@ RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 
 GEN_ALGORITHMS = ["DFS", "Kruskal", "Prim", "Wilson", "Eller", "Hunt and Kill"]
+SOL_ALGORITHMS = ["BFS"]
 
 STAGES = {
   "UNVISITED": GREY,
