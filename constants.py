@@ -20,7 +20,7 @@ DEFAULT_HEIGHT = 10
 
 MIN_DELAY = 0
 MAX_DELAY = 500
-DEFAULT_DELAY = 50
+DEFAULT_DELAY = 0
 
 BLACK = (0, 0, 0)
 WHITE = (255,255,255)
@@ -30,7 +30,7 @@ RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 
 GEN_ALGORITHMS = ["DFS", "Kruskal", "Prim", "Wilson", "Eller", "Hunt and Kill"]
-SOL_ALGORITHMS = ["BFS"]
+SOL_ALGORITHMS = ["DFS", "BFS", "A*"]
 
 STAGES = {
   "UNVISITED": GREY,

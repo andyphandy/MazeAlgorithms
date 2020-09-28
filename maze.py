@@ -4,6 +4,7 @@ from collections import defaultdict
 import time
 import pygame
 import constants
+import heapq
 
 WINDOW_WIDTH = constants.WINDOW_WIDTH
 WINDOW_HEIGHT = constants.WINDOW_HEIGHT
@@ -174,6 +175,10 @@ class Maze:
   def get_grid(self, cell):
     x, y = cell
     return self.grid[y][x]
+
+  def get_path(self, cell):
+    x, y = cell
+    return self.path[y][x]
 
   def get_number(self, cell):
     x, y = cell
@@ -383,19 +388,11 @@ class Maze:
     while queue:
       cell = queue.pop(0)
       if self.get_grid(cell) != "SPECIAL":
-        self.visit(cell, "PROCESSED", int(delay / max(len(queue), 1)))
-      x, y = cell
+        self.visit(cell, "PROCESSED", delay)
       if cell == self.end:
-        while parents[y][x] != cell:
-          self.solution.insert(0, cell)
-          if self.get_grid(cell) != "SPECIAL":
-            self.visit(cell, "PATHFIND", min(delay, 50))
-          cell = parents[y][x]
-          x, y = cell
-        self.solution.insert(0, cell)
-        return self.solution
+        return self.create_solution(parents, cell, delay)
       else:
-        neighbors = self.path[y][x]
+        neighbors = self.get_path(cell)
         for neighbor in neighbors:
           x2, y2 = neighbor
           if parents[y2][x2] == (-1, -1):
@@ -403,10 +400,87 @@ class Maze:
             queue.append(neighbor)
     return self.solution
 
+  def solve_dfs(self, delay):
+    parents = [[(-1, -1) for x in range(self.width)] for y in range(self.height)]
+    stack = [self.start]
+    closed = []
+    cell = stack[0]
+    x, y = cell
+    parents[y][x] = cell
+    while stack:
+      cell = stack[-1]
+      if self.get_grid(cell) != "SPECIAL":
+        self.visit(cell, "PROCESSED", delay)
+      if cell == self.end:
+        return self.create_solution(parents, cell, delay)
+      closed.append(cell)
+      path = self.get_path(cell)
+      neighbors = [neighbor for neighbor in path if not neighbor in closed]
+      if neighbors:
+        selected = random.choice(neighbors)
+        x2, y2 = selected
+        parents[y2][x2] = cell
+        stack.append(selected)
+      else:
+        stack.pop()
+    return self.solution
+
+
+  def solve_a_star(self, delay):
+    costs = [[[-1, -1, -1] for x in range(self.width)] for y in range(self.height)]
+    parents = [[(-1, -1) for x in range(self.width)] for y in range(self.height)]
+    open = []
+    closed = []
+    cell = self.start
+    x, y = cell
+    costs[y][x] = self.compute_a_costs(cell)
+    parents[y][x] = cell
+    heapq.heappush(open, (0, 0, cell))
+    while open:
+      cell = heapq.heappop(open)[2]
+      closed.append(cell)
+      if self.get_grid(cell) != "SPECIAL":
+        self.visit(cell, "PROCESSED", delay)
+      if cell == self.end:
+        return self.create_solution(parents, cell, delay)
+      neighbors = self.get_path(cell)
+      for neighbor in neighbors:
+        if not neighbor in closed and not neighbor in open:
+          x2, y2 = neighbor
+          neighbor_costs = self.compute_a_costs(neighbor)
+          costs[y2][x2] = neighbor_costs
+          parents[y2][x2] = cell
+          if not neighbor in open:
+            heapq.heappush(open, (neighbor_costs[2], neighbor_costs[1], neighbor))
+
+  def compute_a_costs(self, cell):
+    x, y = cell
+    x_start, y_start = self.start
+    x_end, y_end = self.end
+    g = abs(x_start - x) + abs(y_start - y)
+    h = abs(x_end - x) + abs(y_end - y)
+    f = g + h
+    return [g, h, f]
+
+  def create_solution(self, parents, cell, delay):
+    x, y = cell
+    while parents[y][x] != cell:
+      self.solution.insert(0, cell)
+      if self.get_grid(cell) != "SPECIAL":
+        self.visit(cell, "PATHFIND", min(delay, 50))
+      cell = parents[y][x]
+      x, y = cell
+      self.solution.insert(0, cell)
+    return self.solution
+
   def solve(self, algorithm, delay):
     self.solution = []
     self.restore_maze()
-    if algorithm == "BFS":
+    if algorithm == "DFS":
+      self.solve_dfs(delay)
+    elif algorithm == "BFS":
       self.solve_bfs(delay)
+    elif algorithm == "A*":
+      self.solve_a_star(delay)
     self.restore_maze(True)
-    return self.path
+    return self.solution
