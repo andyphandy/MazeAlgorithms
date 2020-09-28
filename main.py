@@ -1,3 +1,8 @@
+#==============================================================================#
+# main.py controls the interaction between the maze, GUI, and the game loop.   #
+# created by Andy Phan.                                                        #
+#==============================================================================#
+
 import pygame
 import pygame_gui
 import constants
@@ -106,10 +111,17 @@ def main():
   maze.draw_maze()
 
   def animation_slider_event(maze):
+    """
+    Changes text of animation delay label to the animation slider's value.
+    """
     delay = animation_slider.get_current_value()
     animation_label.set_text("Animation delay: " + str(delay) + " ms")
 
   def size_slider_event(isWidth):
+    """
+    Changes the text of the corresponding label to the slider's value. If it is
+    a value not matching the maze's, resets the maze.
+    """
     width = width_slider.get_current_value()
     height = height_slider.get_current_value()
     if isWidth:
@@ -124,6 +136,9 @@ def main():
       solve_button.disable()
 
   def generate_button_event():
+    """
+    Generates the maze using the algorithm and delay to display on screen.
+    """
     disable_ui()
     algorithm = generation_menu.selected_option
     delay = animation_slider.get_current_value()
@@ -133,6 +148,9 @@ def main():
     thread.start()
 
   def solve_button_event():
+    """
+    Solves the maze using the algorithm and delay to display on screen.
+    """
     disable_ui()
     algorithm = solve_menu.selected_option
     delay = animation_slider.get_current_value()
@@ -142,6 +160,9 @@ def main():
     thread.start()
 
   def disable_ui():
+    """
+    Disables sliders, buttons, and dropdown menus.
+    """
     width_slider.disable()
     height_slider.disable()
     generate_button.disable()
@@ -151,6 +172,10 @@ def main():
     solve_button.disable()
 
   def enable_ui():
+    """
+    Enables sliders, buttons, and dropdown menus. Only enables solve menu and
+    solve button if maze is fully generated.
+    """
     width_slider.enable()
     height_slider.enable()
     generate_button.enable()
@@ -161,6 +186,9 @@ def main():
       solve_button.enable()
 
   def gui_event(event):
+    """
+    Function that takes in any event and processes the GUI event.
+    """
     if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
       if event.ui_element == generate_button:
         generate_button_event()
@@ -175,6 +203,9 @@ def main():
         animation_slider_event(maze)
 
   def draw_default():
+    """
+    Draws all parts of the program.
+    """
     screen.fill(BLACK)
     maze.draw_maze()
     pygame.draw.rect(screen, GREY, gui)

@@ -1,3 +1,8 @@
+#==============================================================================#
+# constants.py stores all constants used in main.py and maze.py. created by    #
+# Andy Phan.                                                                   #
+#==============================================================================#
+
 WINDOW_WIDTH = 1366
 WINDOW_HEIGHT = 912
 FPS = 60
@@ -20,7 +25,7 @@ DEFAULT_HEIGHT = 10
 
 MIN_DELAY = 0
 MAX_DELAY = 500
-DEFAULT_DELAY = 0
+DEFAULT_DELAY = 50
 
 BLACK = (0, 0, 0)
 WHITE = (255,255,255)
